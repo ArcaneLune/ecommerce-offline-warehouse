@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# 1. 定义集群主机列表（在这里统一修改）
+HOSTS="hadoop100 hadoop101 hadoop102"
+# 2. 判断参数个数
+if [ $# -lt 1 ]; then
+  echo "Usage: $0 <file1/dir1> [file2/dir2] ..."
+  exit 1
+fi
+# 3. 遍历集群所有机器
+for host in $HOSTS; do
+  echo "==================== $host ===================="
+  
+  # 4. 遍历所有要发送的文件/目录
+  for file in "$@"; do
+    # 5. 判断文件是否存在
+    if [ -e "$file" ]; then
+      # 6. 获取父目录（物理路径）和文件名
+      pdir=$(cd -P "$(dirname "$file")" && pwd)
+      fname=$(basename "$file")
+      
+      # 7. 远程创建目录并同步 (合并为一条 rsync 命令)
+      ssh $host "mkdir -p $pdir"
+      if [ $? -eq 0 ]; then
+        rsync -av --rsync-path="sudo rsync" "$pdir/$fname" "$host:$pdir"
+      else
+        echo "ERROR: Failed to create directory on $host"
+      fi
+    else
+      echo "ERROR: $file does not exist!"
+    fi
+  done
+done
