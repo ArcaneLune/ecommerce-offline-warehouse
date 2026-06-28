@@ -1,3 +1,7 @@
+## 开源不易，请各位朋友点个 ***★star★*** 支持一下，非常感谢~
+
+[【 Github地址：https://github.com/ArcaneLune/ecommerce-offline-warehouse 】](https://github.com/ArcaneLune/ecommerce-offline-warehouse)
+
 # 电商大数据离线+实时数仓
 
 [![Architecture](https://img.shields.io/badge/Architecture-Lambda-blue)]()
@@ -85,6 +89,39 @@
     └── src/                                # Java 源码
 ```
 
+电商大数据离线+实时数仓项目由四个关键部分组成：
+---
+
+**1. 数据源模块**
+
+- 通过 **Python 脚本** 生成电商业务模拟数据，涵盖商品、订单、用户、营销、购物车五大业务域共 **29 张表**，写入 **MySQL** 数据库
+- 另一套 Python 脚本模拟生成 **用户行为日志**（页面浏览日志 + App 启动日志），以 `.log` 文件形式落地到服务器磁盘，包含环境信息、页面信息、动作数组、曝光数组等嵌套 JSON 结构
+- 支持在配置文件中设定数据生成的日期范围
+
+**2. 数据采集模块**
+
+业务数据分两路采集：
+
+- **全量通道**：使用 **DataX** 每日凌晨拉取 MySQL 中 **16 张维度/字典类表**，写入 HDFS 的 TEXT 格式分区表
+- **增量通道**：使用 **Flink CDC** 双 Job 架构 —— Job1 监听 13 张事实表的 MySQL binlog 并实时写入 **Kafka** topic_db（upsert-kafka 格式），Job2 从 Kafka 消费后持续写入 **Apache Iceberg** 数据湖（v2 格式，开启行级 Upsert）
+- **日志通道**：用户行为日志通过 **Filebeat** 实时 tail 采集并做 JSON 格式校验后发往 Kafka topic_log，再由 **SeaTunnel** 流式写入 HDFS，ODS 日志表使用 **Hive JsonSerDe** 实现嵌套 STRUCT/ARRAY 自动解析
+
+**3. 数仓模块**
+
+遵循行业标准的 **ODS → DIM → DWD → DWS → ADS** 五层分层架构：
+
+- **ODS 层（30 张）**：16 张 Hive 原生全量表 + 13 张 Iceberg 增量表 + 1 张 JSON SerDe 日志表
+- **DIM 层（8 张）**：构建分析视角，用户维度表采用 **拉链表设计** 处理缓慢变化维（SCD Type 2）
+- **DWD 层（10 张）**：明细事实表，完成数据清洗、JSON 解析、维度退化，覆盖交易/流量/用户/工具/互动五大业务域
+- **DWS 层（12 张）**：按维度粒度做轻度聚合（1d 日粒度 + nd 滑动窗口 + td 历史累积）
+- **ADS 层（16 张）**：应用报表，产出最终业务指标
+
+全链路通过 **DolphinScheduler** 7 节点 DAG 工作流实现每日凌晨自动化调度。计算引擎采用 **Hive on Spark 3.3.1** 驱动，统一使用 **hive CLI** 执行全部 **12000+ 行 Hive SQL**。
+
+**4. 数据可视化**
+
+- ADS 层 16 张报表通过 **DataX** 每日凌晨导出至 MySQL gmall_report 结果库，采用 TextFile 格式 + HDFSReader 实现高效批量导出
+- **Superset** 连接 MySQL 结果库，制作 GMV、转化漏斗、复购率、留存率、用户画像、渠道分析等 **30+ 核心业务指标** 的仪表盘和数据看板，直观展示电商运营数据全景
 ---
 
 ## 数据链路
