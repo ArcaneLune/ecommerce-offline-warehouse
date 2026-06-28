@@ -1,4 +1,4 @@
-# 电商大数据离线数仓
+# 电商大数据离线+实时数仓
 
 [![Architecture](https://img.shields.io/badge/Architecture-Lambda-blue)]()
 [![Engine](https://img.shields.io/badge/Engine-Hive_on_Spark-orange)]()
@@ -6,9 +6,9 @@
 [![Tables](https://img.shields.io/badge/Tables-76-green)]()
 [![SQL](https://img.shields.io/badge/SQL-12000+_lines-lightgrey)]()
 
-从 0 到 1 搭建的完整电商大数据离线数仓项目。采用 **Hive on Spark** 计算引擎 + **Flink CDC** 增量同步 + **Apache Iceberg** 数据湖，基于维度建模构建 ODS → DIM → DWD → DWS → ADS 五层架构，最终通过 DolphinScheduler 实现全链路自动化调度。
+从 0 到 1 搭建的完整的全链路电商大数据离线+实时数仓项目。采用 **Hive on Spark** 计算引擎 + **Flink CDC** 增量同步 + **Apache Iceberg** 数据湖，基于维度建模构建 ODS → DIM → DWD → DWS → ADS 五层架构，最终通过 DolphinScheduler 实现全链路自动化调度。
 
-> 3 台 CentOS 7.9 虚拟机 · 每台 4GB 内存 + 40GB 磁盘 · JDK 1.8 全链路兼容
+> 3 台 CentOS 7.9 虚拟机 · 每台 5GB 内存 + 50GB 磁盘 · JDK 1.8 全链路兼容
 
 ---
 
@@ -41,7 +41,7 @@
 ## 项目结构
 
 ```
-├── doc/                                    # 12 份项目文档
+├── doc/                                    
 │   ├── 电商项目总文档.md
 │   ├── 业务逻辑与数据字典.md
 │   ├── 01.项目环境搭建.md
@@ -54,7 +54,7 @@
 │   ├── 08.ADS层应用报表搭建.md
 │   ├── 09.ADS层数据导出.md
 │   └── 10.DolphinScheduler工作流调度文档.md
-├── sql/                                    # 19 个 SQL 文件
+├── sql/                                    
 │   ├── gmall.sql                           # MySQL 原始 29 表 DDL
 │   ├── ods/
 │   │   ├── ods_full_tables_ddl.sql         # 16 张全量表建表
@@ -186,31 +186,24 @@ datax_full_sync → dim → dwd → dws → ads → ads_export
 
 ## 安装与运行
 
+> doc目录下的文档记录了从头到尾的制作过程
 ```bash
-# 1. 克隆项目
-git clone https://github.com/ArcaneLune/ecommerce-offline-warehouse.git
-
-# 2. 环境部署
+# 1. 环境部署
 # 参考 doc/01.项目环境搭建.md
 
-# 3. 数据同步
-# 全量：bash scripts/full_sync_pipeline.sh
-# 增量：使用 Flink sql-client 提交 cdc_job1.sql 和 cdc_job2.sql
-# 详细参考 doc/02、doc/03、doc/04
+# 2. 日志链路
+# 参考 doc/02.日志链路初始化及运行.md
 
-# 4. 数仓建表（首次）
-hive -f sql/dim/dim_ddl.sql
-hive -f sql/dwd/dwd_ddl.sql
-hive -f sql/dws/dws_ddl.sql
-hive -f sql/ads/ads_ddl.sql
+# 3. 数仓开发
+# 参考doc/03-09
 
-# 5. 首日装载
+# 4. 首日装载
 hive --hivevar dt=2026-06-25 -f sql/dim/dim_load_first.sql
 hive --hivevar dt=2026-06-25 -f sql/dwd/dwd_load_first.sql
 hive --hivevar dt=2026-06-25 -f sql/dws/dws_load_first.sql
 hive --hivevar dt=2026-06-26 -f sql/ads/ads_load_first.sql
 
-# 6. 每日调度（后续由 DolphinScheduler 自动执行）
+# 5. 每日调度（后续由 DolphinScheduler 自动执行）
 hive --hivevar dt=$(date +%Y-%m-%d) -f sql/dim/dim_load_daily.sql
 hive --hivevar dt=$(date +%Y-%m-%d) -f sql/dwd/dwd_load_daily.sql
 hive --hivevar dt=$(date +%Y-%m-%d) -f sql/dws/dws_load_daily.sql
@@ -231,10 +224,9 @@ hive --hivevar dt=$(date +%Y-%m-%d) -f sql/ads/ads_load_daily.sql
 
 ## 项目截图
 
-### DolphinScheduler 全链路调度 DAG
-> 每日凌晨 2 点自动触发，7 个任务节点串并行执行
+### MySQL业务库数据
 
-![DolphinScheduler DAG](images/dolphinscheduler-dag.png)
+![mysql-gmall](images/mysql-gmall.png)
 
 ### 数仓分层表一览
 > 76 张表覆盖 ODS(30) + DIM(8) + DWD(10) + DWS(12) + ADS(16)
@@ -245,7 +237,6 @@ hive --hivevar dt=$(date +%Y-%m-%d) -f sql/ads/ads_load_daily.sql
 > DataX 每日凌晨将 ADS 16 张报表导出至 gmall_report 库
 
 ![MySQL Export](images/mysql-gmall-report.png)
-
 ---
 
 ## 性能指标
